@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Weather Widget</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-body: #ffffff;
+            --bg-panel: #fafafa;
+            --border-panel: #eaeaea;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-body: #191919;
+                --bg-panel: #202020;
+                --border-panel: #2e2e2e;
+            }
+        }
+
+        body {
+            background-color: var(--bg-body);
+            transition: background-color 0.3s;
+        }
+
+        .weather-panel {
+            background-color: var(--bg-panel);
+            border-color: var(--border-panel);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6 antialiased font-sans">
+
+    <!-- Weather Container -->
+    <div class="weather-panel flex flex-col md:flex-row items-center border p-8 rounded-3xl shadow-lg transition-colors duration-300 w-full max-w-[700px]">
+        
+        <!-- Current Weather (Left) -->
+        <div class="flex flex-col items-center md:items-start md:border-r border-neutral-200 dark:border-neutral-700/50 md:pr-8 w-full md:w-[260px] mb-6 md:mb-0 shrink-0">
+            <h2 class="text-[11px] tracking-[0.3em] uppercase font-bold text-neutral-500 dark:text-neutral-400 mb-4" id="location-name">
+                Detecting Location...
+            </h2>
+            
+            <div class="flex items-center gap-5 md:gap-6 text-neutral-800 dark:text-neutral-100 w-full justify-center md:justify-start">
+                <div id="current-icon" class="w-24 h-24 md:w-32 md:h-32 flex justify-center items-center shrink-0">
+                    <!-- Loading Spinner -->
+                    <svg class="animate-spin opacity-50 text-neutral-700 dark:text-neutral-200 w-16 h-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-5xl font-bold tracking-tighter" id="current-temp">--°</div>
+                    <div class="text-sm font-medium text-neutral-500 dark:text-neutral-400 mt-1 tracking-wide" id="current-desc">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hourly Forecast (Right) -->
+        <div class="flex w-full justify-between items-center pl-0 md:pl-8 overflow-x-auto gap-4 pb-2 md:pb-0" id="forecast-container">
+            <!-- Forecast items injected via JS -->
+            <div class="text-xs text-neutral-400 dark:text-neutral-500 text-center w-full">Fetching forecast...</div>
+        </div>
+
+    </div>
+
+    <script>
+        // WMO Weather Code to Description & Meteocons icon mapping
+        function getWeatherInfo(code, isDay = 1) {
+            const dayMod = isDay ? '-day' : '-night';
+            if (code === 0) return { desc: 'Clear', icon: `clear${dayMod}` };
+            if (code === 1 || code === 2) return { desc: 'Partly Cloudy', icon: `partly-cloudy${dayMod}` };
+            if (code === 3) return { desc: 'Cloudy', icon: 'cloudy' };
+            if (code >= 45 && code <= 48) return { desc: 'Fog', icon: 'fog' };
+            if (code >= 51 && code <= 55) return { desc: 'Drizzle', icon: 'drizzle' };
+            if (code >= 61 && code <= 65) return { desc: 'Rain', icon: 'rain' };
+            if (code >= 71 && code <= 77) return { desc: 'Snow', icon: 'snow' };
+            if (code >= 80 && code <= 82) return { desc: 'Showers', icon: 'rain' };
+            if (code >= 95) return { desc: 'Storm', icon: 'thunderstorms' };
+            return { desc: 'Clear', icon: `clear${dayMod}` };
+        }
+
+        async function initWeather() {
+            try {
+                // 1. Get location via IP
+                let lat = 51.5074; // London Fallback
+                let lon = -0.1278;
+                let city = 'London';
+                let tempUnit = 'celsius';
+
+                try {
+                    const geoRes = await fetch('https://get.geojs.io/v1/ip/geo.json');
+                    if (geoRes.ok) {
+                        const geoData = await geoRes.json();
+                        lat = geoData.latitude;
+                        lon = geoData.longitude;
+                        city = geoData.city || geoData.country;
+                        
+                        // Use Fahrenheit for US
+                        if (geoData.country === 'United States' || geoData.country_code === 'US') {
+                            tempUnit = 'fahrenheit';
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Location tracking blocked, using fallback.", e);
+                }
+
+                document.getElementById('location-name').innerText = city;
+
+                // 2. Fetch Weather Data (Open-Meteo requires no API key!)
+                // Added "is_day" to distinguish sun vs moon icons
+                const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,weather_code,is_day&timezone=auto&forecast_hours=6&temperature_unit=${tempUnit}`);
+                
+                if (!weatherRes.ok) throw new Error("Weather API failed");
+                const weatherData = await weatherRes.json();
+
+                // Base URL for Meteocons
+                const iconBaseUrl = 'https://cdn.meteocons.com/3.0.0-next.10/svg/fill/';
+
+                // 3. Render Current Weather
+                const current = weatherData.current;
+                const currentInfo = getWeatherInfo(current.weather_code, current.is_day);
+                
+                document.getElementById('current-icon').innerHTML = `<img src="${iconBaseUrl}${currentInfo.icon}.svg" alt="${currentInfo.desc}" class="w-full h-full object-contain drop-shadow-md" />`;
+                document.getElementById('current-temp').innerText = Math.round(current.temperature_2m) + '°';
+                document.getElementById('current-desc').innerText = currentInfo.desc;
+
+                // 4. Render Hourly Forecast
+                const hourly = weatherData.hourly;
+                const forecastContainer = document.getElementById('forecast-container');
+                let forecastHTML = '';
+                
+                // Show next 5 hours (skip index 0 which is current hour)
+                for (let i = 1; i < 6; i++) {
+                    const date = new Date(hourly.time[i]);
+                    let hourName = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    
+                    const info = getWeatherInfo(hourly.weather_code[i], hourly.is_day[i]);
+                    const temp = Math.round(hourly.temperature_2m[i]);
+
+                    forecastHTML += `
+                        <div class="flex flex-col items-center shrink-0 min-w-[50px]">
+                            <span class="text-[11px] font-bold tracking-widest uppercase text-neutral-400 dark:text-neutral-500 mb-3 whitespace-nowrap">${hourName}</span>
+                            <div class="mb-3 w-12 h-12 flex justify-center items-center">
+                                <img src="${iconBaseUrl}${info.icon}.svg" alt="${info.desc}" class="w-full h-full object-contain drop-shadow-sm" />
+                            </div>
+                            <span class="text-sm font-bold text-neutral-800 dark:text-neutral-200">${temp}°</span>
+                        </div>
+                    `;
+                }
+                
+                forecastContainer.innerHTML = forecastHTML;
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('location-name').innerText = "WEATHER UNAVAILABLE";
+                document.getElementById('current-desc').innerText = "Please try again later";
+                document.getElementById('forecast-container').innerHTML = "";
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initWeather);
+    </script>
+</body>
+</html>
