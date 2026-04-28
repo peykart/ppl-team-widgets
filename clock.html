@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Flip Clocks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-body: #ffffff;
+            --bg-panel: #fafafa;
+            --border-panel: #eaeaea;
+            --bg-clock: #151515;
+            --bg-flap: #1f1f1f;
+            --text-clock: #f3f4f6;
+            --hinge-color: rgba(0,0,0,0.8);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-body: #191919;
+                --bg-panel: #202020;
+                --border-panel: #2e2e2e;
+                --bg-clock: #111111;
+                --bg-flap: #1a1a1a;
+                --text-clock: #e5e5e5;
+                --hinge-color: rgba(0,0,0,1);
+            }
+        }
+
+        body {
+            background-color: var(--bg-body);
+            transition: background-color 0.3s;
+        }
+
+        .clock-panel {
+            background-color: var(--bg-panel);
+            border-color: var(--border-panel);
+        }
+
+        .digit {
+            width: 42px;
+            height: 64px;
+        }
+
+        .flip-card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            border-radius: 6px;
+            perspective: 800px;
+            background: var(--bg-clock);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .upper, .lower, .flap {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            background: var(--bg-flap);
+            color: var(--text-clock);
+            font-size: 42px;
+            font-weight: 700;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .upper, .upper-flap {
+            top: 0;
+            border-radius: 6px 6px 0 0;
+            border-bottom: none;
+        }
+
+        .lower, .lower-flap {
+            bottom: 0;
+            border-radius: 0 0 6px 6px;
+            border-top: none;
+        }
+
+        /* Absolutely center the text to perfectly align halves */
+        .upper span, .upper-flap span {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 200%;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .lower span, .lower-flap span {
+            position: absolute;
+            bottom: 0; left: 0; width: 100%; height: 200%;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* Ambient gradients for depth */
+        .upper::after, .lower::after, .flap::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+        }
+        .upper::after { background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 100%); }
+        .lower::after { background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 100%); }
+
+        /* The horizontal hinge line */
+        .flip-card::after {
+            content: "";
+            position: absolute;
+            top: 50%; left: 0; width: 100%; height: 2px;
+            background: var(--hinge-color);
+            margin-top: -1px;
+            z-index: 20;
+        }
+
+        /* Flaps mechanics */
+        .flap {
+            z-index: 10;
+            backface-visibility: hidden;
+            transform-style: preserve-3d;
+        }
+        
+        .upper-flap {
+            transform-origin: bottom center;
+            z-index: 12;
+        }
+        
+        .lower-flap {
+            transform-origin: top center;
+            transform: rotateX(90deg);
+            z-index: 11;
+        }
+
+        /* Animation Classes */
+        .animate-flip-down {
+            animation: flipDown 0.3s ease-in forwards;
+        }
+        .animate-flip-up {
+            animation: flipUp 0.3s ease-out 0.3s forwards;
+        }
+
+        @keyframes flipDown {
+            0% { transform: rotateX(0deg); }
+            100% { transform: rotateX(-90deg); }
+        }
+        @keyframes flipUp {
+            0% { transform: rotateX(90deg); }
+            100% { transform: rotateX(0deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6 antialiased font-sans">
+
+    <!-- Clocks Container -->
+    <div class="flex flex-wrap justify-center gap-8 w-full max-w-[600px]">
+
+        <!-- London Clock -->
+        <div class="clock-panel flex flex-col items-center border p-6 rounded-3xl shadow-lg transition-colors duration-300">
+            <h2 class="text-[11px] tracking-[0.3em] uppercase font-bold text-neutral-500 dark:text-neutral-400 mb-5">London</h2>
+            <div class="flex items-center">
+                <div class="flex gap-1.5">
+                    <div class="digit" id="london-h-1"></div>
+                    <div class="digit" id="london-h-2"></div>
+                </div>
+                <div class="flex flex-col gap-2.5 mx-3">
+                    <div class="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600"></div>
+                    <div class="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600"></div>
+                </div>
+                <div class="flex gap-1.5">
+                    <div class="digit" id="london-m-1"></div>
+                    <div class="digit" id="london-m-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paris Clock -->
+        <div class="clock-panel flex flex-col items-center border p-6 rounded-3xl shadow-lg transition-colors duration-300">
+            <h2 class="text-[11px] tracking-[0.3em] uppercase font-bold text-neutral-500 dark:text-neutral-400 mb-5">Paris</h2>
+            <div class="flex items-center">
+                <div class="flex gap-1.5">
+                    <div class="digit" id="paris-h-1"></div>
+                    <div class="digit" id="paris-h-2"></div>
+                </div>
+                <div class="flex flex-col gap-2.5 mx-3">
+                    <div class="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600"></div>
+                    <div class="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600"></div>
+                </div>
+                <div class="flex gap-1.5">
+                    <div class="digit" id="paris-m-1"></div>
+                    <div class="digit" id="paris-m-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dubai Clock -->
+        <div class="clock-panel flex flex-col items-center border p-6 rounded-3xl shadow-lg transition-colors duration-300">
+            <h2 class="text-[11px] tracking-[0.3em] uppercase font-bold text-neutral-500 dark:text-neutral-400 mb-5">Dubai</h2>
+            <div class="flex items-center">
+                <div class="flex gap-1.5">
+                    <div class="digit" id="dubai-h-1"></div>
+                    <div class="digit" id="dubai-h-2"></div>
+                </div>
+                <div class="flex flex-col gap-2.5 mx-3">
+                    <div class="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600"></div>
+                    <div class="w-1.5 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-600"></div>
+                </div>
+                <div class="flex gap-1.5">
+                    <div class="digit" id="dubai-m-1"></div>
+                    <div class="digit" id="dubai-m-2"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        class FlipDigit {
+            constructor(el, initialValue) {
+                this.el = el;
+                this.value = initialValue;
+                this.buildHTML(initialValue);
+            }
+
+            buildHTML(val) {
+                this.el.innerHTML = `
+                    <div class="flip-card">
+                        <div class="upper"><span>${val}</span></div>
+                        <div class="lower"><span>${val}</span></div>
+                        <div class="flap upper-flap"><span>${val}</span></div>
+                        <div class="flap lower-flap"><span>${val}</span></div>
+                    </div>
+                `;
+            }
+
+            update(val) {
+                if (val === this.value) return;
+
+                const card = this.el.querySelector('.flip-card');
+                const upper = card.querySelector('.upper span');
+                const lower = card.querySelector('.lower span');
+                const upperFlap = card.querySelector('.upper-flap');
+                const lowerFlap = card.querySelector('.lower-flap');
+                const upperFlapSpan = upperFlap.querySelector('span');
+                const lowerFlapSpan = lowerFlap.querySelector('span');
+
+                // Prepare next animation frame states
+                upperFlapSpan.innerText = this.value;
+                lowerFlapSpan.innerText = val;
+                upper.innerText = val;
+                lower.innerText = this.value;
+
+                // Reset animations
+                upperFlap.classList.remove('animate-flip-down');
+                lowerFlap.classList.remove('animate-flip-up');
+                
+                // Trigger reflow to restart animation reliably
+                void upperFlap.offsetWidth;
+                void lowerFlap.offsetWidth;
+
+                // Fire animations
+                upperFlap.classList.add('animate-flip-down');
+                lowerFlap.classList.add('animate-flip-up');
+
+                this.value = val;
+
+                // Cleanup and finalize static state after animation ends
+                setTimeout(() => {
+                    lower.innerText = val;
+                    upperFlapSpan.innerText = val;
+                    upperFlap.classList.remove('animate-flip-down');
+                    lowerFlap.classList.remove('animate-flip-up');
+                }, 600);
+            }
+        }
+
+        class FlipClock {
+            constructor(id, timezone) {
+                this.timezone = timezone;
+                const { h, m } = this.getCurrentTime();
+                
+                this.digits = {
+                    h1: new FlipDigit(document.getElementById(`${id}-h-1`), h[0]),
+                    h2: new FlipDigit(document.getElementById(`${id}-h-2`), h[1]),
+                    m1: new FlipDigit(document.getElementById(`${id}-m-1`), m[0]),
+                    m2: new FlipDigit(document.getElementById(`${id}-m-2`), m[1])
+                };
+            }
+
+            getCurrentTime() {
+                const now = new Date();
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                    timeZone: this.timezone,
+                    hourCycle: 'h23',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const parts = formatter.formatToParts(now);
+                let h = '00', m = '00';
+                
+                parts.forEach(p => {
+                    if (p.type === 'hour') h = p.value.padStart(2, '0');
+                    if (p.type === 'minute') m = p.value.padStart(2, '0');
+                });
+
+                return { h, m };
+            }
+
+            updateTime() {
+                const { h, m } = this.getCurrentTime();
+                this.digits.h1.update(h[0]);
+                this.digits.h2.update(h[1]);
+                this.digits.m1.update(m[0]);
+                this.digits.m2.update(m[1]);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Timezone identifiers for the respective cities
+            const londonClock = new FlipClock('london', 'Europe/London');
+            const parisClock = new FlipClock('paris', 'Europe/Paris');
+            const dubaiClock = new FlipClock('dubai', 'Asia/Dubai');
+
+            // Sync update tick loop
+            setInterval(() => {
+                londonClock.updateTime();
+                parisClock.updateTime();
+                dubaiClock.updateTime();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
